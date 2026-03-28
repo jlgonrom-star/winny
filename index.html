@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pizarra Mágica - Letras y Números al 100</title>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script&family=Short+Stack&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        :root { --cielo: #add8e6; --pasto: #90ee90; --tierra: #deb887; --guia: #e74c3c; --azul: #3498db; }
+        body { font-family: 'Short Stack', cursive; margin: 0; background: #f0f7f9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; touch-action: none; }
+        
+        header { background: var(--azul); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
+        .toolbar { background: white; padding: 10px; display: flex; justify-content: center; gap: 10px; border-bottom: 2px solid #ddd; z-index: 1000; flex-wrap: wrap; }
+        
+        #main-stage { flex-grow: 1; padding: 15px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        
+        #report-header-info { display: none; padding: 10px; border-bottom: 2px solid var(--azul); margin-bottom: 20px; }
+
+        .practice-card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 6px 12px rgba(0,0,0,0.08); position: relative; min-height: 700px; page-break-after: always; }
+        .label-card { color: var(--azul); font-size: 18px; margin-bottom: 10px; border-left: 6px solid var(--azul); padding-left: 12px; font-weight: bold; }
+
+        .renglon { position: relative; height: 100px; width: 100%; display: flex; align-items: center; margin-bottom: 10px; pointer-events: none; }
+        .pauta-lines { position: absolute; width: 100%; height: 100%; }
+        .l-sky { border-top: 2px dashed var(--cielo); position: absolute; top: 20%; width: 100%; }
+        .l-grass { border-top: 1px solid var(--pasto); position: absolute; top: 60%; width: 100%; }
+        .l-earth { border-top: 3px solid var(--tierra); position: absolute; top: 90%; width: 100%; }
+
+        .content-display { font-size: 30px; position: relative; z-index: 1; padding-left: 15px; letter-spacing: 15px; opacity: 0.15; color: #000; }
+        .molde { font-family: 'Short Stack', cursive; }
+        .cursiva { font-family: 'Dancing Script', cursive; letter-spacing: 8px; padding-top: 10px; }
+
+        .drawing-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 500; pointer-events: auto; background: transparent; touch-action: none; }
+        .hints-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+        .dot-start { position: absolute; width: 10px; height: 10px; background: var(--guia); border-radius: 50%; box-shadow: 0 0 4px #fff; }
+
+        button, select { padding: 10px 15px; border-radius: 12px; border: 2px solid #ddd; font-family: inherit; font-weight: bold; cursor: pointer; }
+        .btn-active { background: var(--azul) !important; color: white !important; }
+        .btn-next { background: #2ecc71; color: white; border: none; }
+        .btn-pdf { background: #9b59b6; color: white; border: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>Practicando: <span id="current-item-title">A</span></div>
+    <div>🏅 <span id="medal-count">0</span></div>
+</header>
+
+<div class="toolbar">
+    <select id="select-style" onchange="renderStage()">
+        <option value="molde">Letra de Molde</option>
+        <option value="cursiva">Letra Cursiva</option>
+    </select>
+    <button id="pencil-btn" class="btn-active" onclick="changeTool('pencil')">✏️ Lápiz</button>
+    <button id="eraser-btn" onclick="changeTool('eraser')">🧽 Goma</button>
+    <button class="btn-pdf" onclick="generatePDF()">📄 Guardar Tarea</button>
+    <button class="btn-next" onclick="nextStep()">Siguiente ➔</button>
+</div>
+
+<div id="main-stage">
+    <div id="report-header-info">
+        <h2 style="margin:0; color:#3498db;">Reporte de Caligrafía - Tarea Escolar</h2>
+        <p id="pdf-datetime" style="margin:5px 0; font-size: 14px; color: #555;"></p>
+    </div>
+    <div id="report-container"></div>
+</div>
+
+<script>
+    let currentIndex = 0;
+    let medals = 0;
+    let tool = 'pencil';
+    let drawing = false;
+
+    // Abecedario + Números Clave (0-10 y decenas para no saturar)
+    const items = [... "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ".split(""), "0","1","2","3","4","5","6","7","8","9","10","20","30","40","50","60","70","80","90","100"];
+    const sectionCanvases = [];
+
+    // Diccionario de letras
+    const wordsDB = {
+        'A':{es:'Avión',en:'Airplane'}, 'B':{es:'Barco',en:'Boat'}, 'C':{es:'Casa',en:'House'}, 'D':{es:'Dado',en:'Dice'},
+        'E':{es:'Elefante',en:'Elephant'}, 'F':{es:'Flor',en:'Flower'}, 'G':{es:'Gato',en:'Cat'}, 'H':{es:'Hielo',en:'Ice'},
+        'I':{es:'Iguana',en:'Iguana'}, 'J':{es:'Jirafa',en:'Giraffe'}, 'K':{es:'Koala',en:'Koala'}, 'L':{es:'Luna',en:'Moon'},
+        'M':{es:'Manzana',en:'Apple'}, 'N':{es:'Nube',en:'Cloud'}, 'Ñ':{es:'Ñandú',en:'Rhea'}, 'O':{es:'Ojo',en:'Eye'},
+        'P':{es:'Perro',en:'Dog'}, 'Q':{es:'Queso',en:'Cheese'}, 'R':{es:'Ratón',en:'Mouse'}, 'S':{es:'Sol',en:'Sun'},
+        'T':{es:'Tigre',en:'Tiger'}, 'U':{es:'Uva',en:'Grape'}, 'V':{es:'Vaca',en:'Cow'}, 'W':{es:'Waffle',en:'Waffle'},
+        'X':{es:'Xilófono',en:'Xylophone'}, 'Y':{es:'Yoyo',en:'Yoyo'}, 'Z':{es:'Zebra',en:'Zebra'}
+    };
+
+    // Traductor dinámico para números 0-100
+    function getNumberWords(n) {
+        const es = ["Cero","Diez","Veinte","Treinta","Cuarenta","Cincuenta","Sesenta","Setenta","Ochenta","Noventa","Cien"];
+        const en = ["Zero","Ten","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety","Hundred"];
+        const simplesEs = ["Cero","Uno","Dos","Tres","Cuatro","Cinco","Seis","Siete","Ocho","Nueve"];
+        const simplesEn = ["Zero","One","Two","Three","Four","Five","Six","Seven","Eight","Nine"];
+        
+        if(n < 10) return { es: simplesEs[n], en: simplesEn[n] };
+        if(n === 100) return { es: "Cien", en: "One Hundred" };
+        const idx = Math.floor(n / 10);
+        return { es: es[idx], en: en[idx] };
+    }
+
+    function changeTool(newTool) {
+        tool = newTool;
+        document.getElementById('pencil-btn').className = (tool === 'pencil') ? 'btn-active' : '';
+        document.getElementById('eraser-btn').className = (tool === 'eraser') ? 'btn-active' : '';
+    }
+
+    async function generatePDF() {
+        const headerInfo = document.getElementById('report-header-info');
+        const dtElement = document.getElementById('pdf-datetime');
+        const currentItem = items[currentIndex];
+        const ahora = new Date();
+        dtElement.innerText = `Práctica: ${currentItem} | Fecha: ${ahora.toLocaleDateString()} | Hora: ${ahora.toLocaleTimeString()}`;
+        headerInfo.style.display = 'block';
+
+        const opt = {
+            margin: 5, filename: `Tarea_${currentItem}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        try { await html2pdf().set(opt).from(document.getElementById('main-stage')).save(); } 
+        finally { headerInfo.style.display = 'none'; }
+    }
+
+    function initCanvases() {
+        sectionCanvases.length = 0;
+        document.querySelectorAll('.practice-card').forEach((card) => {
+            const canvas = card.querySelector('.drawing-canvas');
+            canvas.width = card.offsetWidth;
+            canvas.height = card.offsetHeight;
+            const ctx = canvas.getContext('2d');
+            sectionCanvases.push({ canvas, ctx });
+            
+            const stop = () => { drawing = false; ctx.beginPath(); };
+            const start = (e) => {
+                drawing = true;
+                const rect = canvas.getBoundingClientRect();
+                const t = e.touches ? e.touches[0] : e;
+                ctx.beginPath();
+                ctx.moveTo(t.clientX - rect.left, t.clientY - rect.top);
+                if (e.cancelable) e.preventDefault();
+            };
+            const move = (e) => {
+                if (!drawing) return;
+                const rect = canvas.getBoundingClientRect();
+                const t = e.touches ? e.touches[0] : e;
+                ctx.globalCompositeOperation = (tool === 'pencil') ? 'source-over' : 'destination-out';
+                ctx.strokeStyle = (tool === 'pencil') ? '#2c3e50' : 'rgba(0,0,0,1)';
+                ctx.lineWidth = (tool === 'pencil') ? 3 : 30;
+                ctx.lineCap = 'round';
+                ctx.lineTo(t.clientX - rect.left, t.clientY - rect.top);
+                ctx.stroke();
+                if (e.cancelable) e.preventDefault();
+            };
+
+            canvas.addEventListener('touchstart', start, {passive: false});
+            canvas.addEventListener('touchmove', move, {passive: false});
+            canvas.addEventListener('touchend', stop);
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', stop);
+        });
+    }
+
+    function renderStage() {
+        const item = items[currentIndex];
+        const style = document.getElementById('select-style').value;
+        const container = document.getElementById('report-container');
+        document.getElementById('current-item-title').innerText = item;
+        
+        let words = wordsDB[item];
+        if(!words) words = getNumberWords(parseInt(item));
+
+        const displayMain = isNaN(item) ? `${item} ${item.toLowerCase()}` : `${item}`;
+
+        container.innerHTML = `
+            ${createSection("1. Guía de Trazo", displayMain, true, style)}
+            ${createSection(`2. Español: ${words.es}`, words.es, false, style)}
+            ${createSection(`3. English: ${words.en}`, words.en, false, style)}
+            ${createSection("4. Reto Libre", "", false, style)}
+        `;
+        setTimeout(initCanvases, 500);
+        document.getElementById('main-stage').scrollTop = 0;
+    }
+
+    function createSection(label, text, withHints, fontStyle) {
+        let renglonesHtml = '';
+        const xPos = isNaN(items[currentIndex]) ? 31 : 35; // Calibración simple de punto rojo
+        for (let i = 0; i < 6; i++) {
+            let hHtml = (withHints && i === 0) ? `<div class="dot-start" style="left:${xPos}px; top:35px;"></div>` : '';
+            renglonesHtml += `<div class="renglon">
+                <div class="pauta-lines"><div class="l-sky"></div><div class="l-grass"></div><div class="l-earth"></div></div>
+                <div class="hints-container">${hHtml}</div>
+                <div class="content-display ${fontStyle}">${text}</div>
+            </div>`;
+        }
+        return `<div class="practice-card"><div class="label-card">${label}</div><canvas class="drawing-canvas"></canvas>${renglonesHtml}</div>`;
+    }
+
+    function nextStep() {
+        medals++;
+        document.getElementById('medal-count').innerText = medals;
+        currentIndex = (currentIndex + 1) % items.length;
+        renderStage();
+    }
+
+    window.onload = renderStage;
+</script>
+</body>
+</html>
