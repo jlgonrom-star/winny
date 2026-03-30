@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pizarra Mágica - Calibración Precisa</title>
+    <title>Pizarra Mágica - Completa</title>
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script&family=Short+Stack&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
@@ -27,7 +27,7 @@
         #main-stage::-webkit-scrollbar-track { background: #e1f0f5; border-radius: 10px; }
         #main-stage::-webkit-scrollbar-thumb { background: #b0bec5; border-radius: 10px; border: 2px solid #e1f0f5; }
 
-        .practice-card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 6px 12px rgba(0,0,0,0.08); position: relative; min-height: 700px; }
+        .practice-card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 6px 12px rgba(0,0,0,0.08); position: relative; min-height: 700px; page-break-after: always; }
         .label-card { color: var(--azul); font-size: 18px; margin-bottom: 10px; border-left: 6px solid var(--azul); padding-left: 12px; font-weight: bold; }
         .renglon { position: relative; height: 100px; width: 100%; display: flex; align-items: center; margin-bottom: 10px; pointer-events: none; }
         .pauta-lines { position: absolute; width: 100%; height: 100%; }
@@ -41,6 +41,7 @@
         button, select { padding: 10px 15px; border-radius: 12px; border: 2px solid #ddd; font-family: inherit; font-weight: bold; cursor: pointer; }
         .btn-active { background: var(--azul) !important; color: white !important; }
         .btn-next { background: #2ecc71; color: white; border: none; }
+        .btn-pdf { background: #9b59b6; color: white; border: none; }
     </style>
 </head>
 <body>
@@ -57,6 +58,7 @@
     </select>
     <button id="pencil-btn" class="btn-active" onclick="changeTool('pencil')">✏️ Lápiz</button>
     <button id="eraser-btn" onclick="changeTool('eraser')">🧽 Goma</button>
+    <button class="btn-pdf" onclick="generatePDF()">📄 Guardar Tarea</button>
     <button class="btn-next" onclick="nextStep()">Siguiente ➔</button>
 </div>
 
@@ -71,7 +73,27 @@
     let drawing = false;
 
     const items = [... "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ".split(""), "0","1","2","3","4","5","6","7","8","9","10","20","30","40","50","60","70","80","90","100"];
-    const wordsDB = {'A':{es:'Avión',en:'Airplane'},'B':{es:'Barco',en:'Boat'},'C':{es:'Casa',en:'House'},'D':{es:'Dado',en:'Dice'},'E':{es:'Elefante',en:'Elephant'},'F':{es:'Flor',en:'Flower'},'G':{es:'Gato',en:'Cat'},'H':{es:'Hielo',en:'Ice'},'I':{es:'Iguana',en:'Iguana'},'J':{es:'Jirafa',en:'Giraffe'},'K':{es:'Koala',en:'Koala'},'L':{es:'Luna',en:'Moon'},'M':{es:'Manzana',en:'Apple'},'N':{es:'Nube',en:'Cloud'},'Ñ':{es:'Ñandú',en:'Rhea'},'O':{es:'Ojo',en:'Eye'},'P':{es:'Perro',en:'Dog'},'Q':{es:'Queso',en:'Cheese'},'R':{es:'Ratón',en:'Mouse'},'S':{es:'Sol',en:'Sun'},'T':{es:'Tigre',en:'Tiger'},'U':{es:'Uva',en:'Grape'},'V':{es:'Vaca',en:'Cow'},'W':{es:'Waffle',en:'Waffle'},'X':{es:'Xilófono',en:'Xylophone'},'Y':{es:'Yoyo',en:'Yoyo'},'Z':{es:'Zebra',en:'Zebra'}};
+    
+    const wordsDB = {
+        'A':{es:'Avión',en:'Airplane'}, 'B':{es:'Barco',en:'Boat'}, 'C':{es:'Casa',en:'House'}, 'D':{es:'Dado',en:'Dice'},
+        'E':{es:'Elefante',en:'Elephant'}, 'F':{es:'Flor',en:'Flower'}, 'G':{es:'Gato',en:'Cat'}, 'H':{es:'Hielo',en:'Ice'},
+        'I':{es:'Iguana',en:'Iguana'}, 'J':{es:'Jirafa',en:'Giraffe'}, 'K':{es:'Koala',en:'Koala'}, 'L':{es:'Luna',en:'Moon'},
+        'M':{es:'Manzana',en:'Apple'}, 'N':{es:'Nube',en:'Cloud'}, 'Ñ':{es:'Ñandú',en:'Rhea'}, 'O':{es:'Ojo',en:'Eye'},
+        'P':{es:'Perro',en:'Dog'}, 'Q':{es:'Queso',en:'Cheese'}, 'R':{es:'Ratón',en:'Mouse'}, 'S':{es:'Sol',en:'Sun'},
+        'T':{es:'Tigre',en:'Tiger'}, 'U':{es:'Uva',en:'Grape'}, 'V':{es:'Vaca',en:'Cow'}, 'W':{es:'Waffle',en:'Waffle'},
+        'X':{es:'Xilófono',en:'Xylophone'}, 'Y':{es:'Yoyo',en:'Yoyo'}, 'Z':{es:'Zebra',en:'Zebra'}
+    };
+
+    function getNumberWords(n) {
+        const es = ["Cero","Diez","Veinte","Treinta","Cuarenta","Cincuenta","Sesenta","Setenta","Ochenta","Noventa","Cien"];
+        const en = ["Zero","Ten","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety","Hundred"];
+        const simplesEs = ["Cero","Uno","Dos","Tres","Cuatro","Cinco","Seis","Siete","Ocho","Nueve"];
+        const simplesEn = ["Zero","One","Two","Three","Four","Five","Six","Seven","Eight","Nine"];
+        if(n < 10) return { es: simplesEs[n], en: simplesEn[n] };
+        if(n === 100) return { es: "Cien", en: "One Hundred" };
+        const idx = Math.floor(n / 10);
+        return { es: es[idx], en: en[idx] };
+    }
 
     function changeTool(t) {
         tool = t;
@@ -83,11 +105,17 @@
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        // Esta es la clave: restamos el rectángulo del canvas al punto de contacto del cliente
-        return {
-            x: clientX - rect.left,
-            y: clientY - rect.top
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    async function generatePDF() {
+        const opt = {
+            margin: 5, filename: `Tarea_${items[currentIndex]}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
+        await html2pdf().set(opt).from(document.getElementById('main-stage')).save();
     }
 
     function initCanvases() {
@@ -110,7 +138,7 @@
                 const pos = getPos(e, canvas);
                 ctx.globalCompositeOperation = (tool === 'pencil') ? 'source-over' : 'destination-out';
                 ctx.strokeStyle = '#2c3e50';
-                ctx.lineWidth = (tool === 'pencil') ? 1.5 : 30; // Trazo fino aplicado
+                ctx.lineWidth = (tool === 'pencil') ? 1.5 : 30;
                 ctx.lineCap = 'round';
                 ctx.lineTo(pos.x, pos.y);
                 ctx.stroke();
@@ -131,17 +159,27 @@
         const style = document.getElementById('select-style').value;
         const container = document.getElementById('report-container');
         document.getElementById('current-item-title').innerText = item;
-        const display = isNaN(item) ? `${item} ${item.toLowerCase()}` : item;
         
-        container.innerHTML = `${cS("1. Trazo",display,true,style)}${cS("2. Libre","",false,style)}`;
+        let words = wordsDB[item];
+        if(!words) words = getNumberWords(parseInt(item));
+        const display = isNaN(item) ? `${item} ${item.toLowerCase()}` : item;
+
+        container.innerHTML = `
+            ${cS("1. Guía de Trazo", display, true, style)}
+            ${cS("2. Español: " + words.es, words.es, false, style)}
+            ${cS("3. English: " + words.en, words.en, false, style)}
+            ${cS("4. Reto Libre", "", false, style)}
+        `;
         setTimeout(initCanvases, 300);
+        document.getElementById('main-stage').scrollTop = 0;
     }
 
     function cS(l, t, h, f) {
         let r = '';
-        for (let i = 0; i < 4; i++) {
-            let dot = (h && i === 0) ? `<div class="dot-start" style="left:31px; top:35px;"></div>` : '';
-            r += `<div class="renglon"><div class="pauta-lines"><div class="l-sky"></div><div class="l-grass"></div><div class="l-earth"></div></div>${dot}<div class="content-display ${f}">${t}</div></div>`;
+        const xPos = isNaN(items[currentIndex]) ? 31 : 35;
+        for (let i = 0; i < 6; i++) {
+            let dot = (h && i === 0) ? `<div class="dot-start" style="left:${xPos}px; top:35px;"></div>` : '';
+            r += `<div class="renglon"><div class="pauta-lines"><div class="l-sky"></div><div class="l-grass"></div><div class="l-earth"></div></div><div style="position:absolute;width:100%;height:100%">${dot}</div><div class="content-display ${f}">${t}</div></div>`;
         }
         return `<div class="practice-card"><div class="label-card">${l}</div><canvas class="drawing-canvas"></canvas>${r}</div>`;
     }
